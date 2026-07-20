@@ -45,11 +45,15 @@ def gestionar_base_datos():
             cursor.execute(tabla_servicios_sql)
             print("Tablas listas\n")
 
+        while True:
+
             # --- Menu de Inicio de 2 Opciones ---
             print("--- MENU PRINCIPAL ---")
             print("1. Registrar nuevo usuario y flor")
             print("2. Borrar usuario por ID")
-            opcion = input("Selecciona una opcion (1 o 2): ")
+            print("3. actualizar usuario por ID")
+            print("4. salir")
+            opcion = input("Selecciona una opcion (1, 2, 3 o 4): ")
 
             if opcion == "1":
                 # --- Opcion Registro ---
@@ -89,7 +93,35 @@ def gestionar_base_datos():
                 
                 conexion.commit()
                 print(f"Usuario con ID {id_usuario_borrar} y sus servicios han sido eliminados")
+
+            elif opcion == "3":
+                # --- Opcion Actualizar ---
+                print("\n--- Actualizar Usuario ---")
+                id_usuario_actualizar = int(input("Introduce el ID del usuario que deseas actualizar: "))
+                
+                # Verificamos si el usuario existe
+                cursor.execute("SELECT * FROM usuarios WHERE id_usuarios = %s", (id_usuario_actualizar,))
+                usuario_existente = cursor.fetchone()
+                
+                if usuario_existente:
+                    nuevo_nombre = input("Introduce el nuevo nombre de usuario: ")
+                    nuevo_email = input("Introduce el nuevo email: ")
+                    nueva_password = input("Introduce la nueva contrasenia: ")
+                    
+                    sql_actualizar_usuario = """
+                    UPDATE usuarios 
+                    SET nombre_usuario = %s, email = %s, password = %s 
+                    WHERE id_usuarios = %s
+                    """
+                    cursor.execute(sql_actualizar_usuario, (nuevo_nombre, nuevo_email, nueva_password, id_usuario_actualizar))
+                    conexion.commit()
+                    print(f"Usuario con ID {id_usuario_actualizar} ha sido actualizado")
+                else:
+                    print(f"No se encontró un usuario con ID {id_usuario_actualizar}")
             
+            elif opcion == "4":
+                print("Saliendo del programa")
+                break           
             else:
                 print("Opcion no valida")
 
