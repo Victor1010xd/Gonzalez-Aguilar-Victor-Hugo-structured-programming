@@ -1,14 +1,19 @@
 import mysql.connector
 from mysql.connector import Error
+import re
+
+# --- Función para validar email ---
+def validar_email(email):
+    patron = r'^[\w\.-]+@[\w\.-]+\.\w+$'
+    return re.match(patron, email) is not None
 
 def gestionar_base_datos():
     try:
-        # Conexion local
         conexion = mysql.connector.connect(
             host='127.0.0.1',
-            user='root',       
-            password='',       
-            database='floreria' 
+            user='root',
+            password='',
+            database='floreria'
         )
 
         if conexion.is_connected():
@@ -46,25 +51,34 @@ def gestionar_base_datos():
             print("Tablas listas\n")
 
         while True:
-
-            # --- Menu de Inicio de 2 Opciones ---
             print("--- MENU PRINCIPAL ---")
             print("1. Registrar nuevo usuario y flor")
             print("2. Borrar usuario por ID")
-            print("3. actualizar usuario por ID")
-            print("4. salir")
-            opcion = input("Selecciona una opcion (1, 2, 3 o 4): ")
+            print("3. Actualizar usuario y flor por ID")
+            print("4. Mostrar todos los usuarios")
+            print("5. Salir")
+            opcion = input("Selecciona una opcion (1-5): ")
 
             if opcion == "1":
-                # --- Opcion Registro ---
+                # --- Registro ---
                 print("\n--- Registro de Usuario ---")
                 nombre_input = input("Introduce el nombre de usuario: ")
-                email_input = input("Introduce el email: ")
+
+                # Validación de correo
+                while True:
+                    email_input = input("Introduce el email: ")
+                    if validar_email(email_input):
+                        break
+                    else:
+                        print("❌ Correo inválido. Ejemplo válido: ejemplo@gmail.com")
+
                 password_input = input("Introduce la contrasenia: ")
 
                 insertar_usuario = "INSERT INTO usuarios (nombre_usuario, email, password) VALUES (%s, %s, %s)"
                 cursor.execute(insertar_usuario, (nombre_input, email_input, password_input))
                 id_usuario_generado = cursor.lastrowid
+
+                print(f"✅ Usuario registrado con ID: {id_usuario_generado}")
 
                 print("\n--- Registro de Flor ---")
                 nombre_flor_input = input("Introduce el nombre de la flor: ")
@@ -74,39 +88,40 @@ def gestionar_base_datos():
                 insertar_flor = "INSERT INTO servicios (nombre_flor, description, precio, comprador) VALUES (%s, %s, %s, %s)"
                 datos_flor = (nombre_flor_input, descripcion_input, precio_input, id_usuario_generado)
                 cursor.execute(insertar_flor, datos_flor)
-                
+
                 conexion.commit()
                 print("Datos guardados con exito")
 
             elif opcion == "2":
-                # --- Opcion Borrar ---
-                print("\n--- Borrar Usuario de la Base de Datos ---")
-                id_usuario_borrar = int(input("Introduce el ID del usuario que deseas eliminar por completo: "))
+                # --- Borrar ---
+                print("\n--- Borrar Usuario ---")
+                id_usuario_borrar = int(input("Introduce el ID del usuario: "))
                 
-                # Borramos los servicios asociados a ese comprador
-                sql_borrar_servicios = "DELETE FROM servicios WHERE comprador = %s"
-                cursor.execute(sql_borrar_servicios, (id_usuario_borrar,))
-                
-                # Eliminamos al usuario de la tabla usuarios
-                sql_borrar_usuario = "DELETE FROM usuarios WHERE id_usuarios = %s"
-                cursor.execute(sql_borrar_usuario, (id_usuario_borrar,))
-                
+                cursor.execute("DELETE FROM servicios WHERE comprador = %s", (id_usuario_borrar,))
+                cursor.execute("DELETE FROM usuarios WHERE id_usuarios = %s", (id_usuario_borrar,))
                 conexion.commit()
-                print(f"Usuario con ID {id_usuario_borrar} y sus servicios han sido eliminados")
+                print(f"Usuario con ID {id_usuario_borrar} eliminado junto con sus servicios")
 
             elif opcion == "3":
-                # --- Opcion Actualizar ---
-                print("\n--- Actualizar Usuario ---")
-                id_usuario_actualizar = int(input("Introduce el ID del usuario que deseas actualizar: "))
+                # --- Actualizar Usuario y Flor ---
+                print("\n--- Actualizar Usuario y Flor ---")
+                id_usuario_actualizar = int(input("Introduce el ID del usuario: "))
                 
-                # Verificamos si el usuario existe
                 cursor.execute("SELECT * FROM usuarios WHERE id_usuarios = %s", (id_usuario_actualizar,))
                 usuario_existente = cursor.fetchone()
                 
                 if usuario_existente:
-                    nuevo_nombre = input("Introduce el nuevo nombre de usuario: ")
-                    nuevo_email = input("Introduce el nuevo email: ")
-                    nueva_password = input("Introduce la nueva contrasenia: ")
+                    nuevo_nombre = input("Nuevo nombre: ")
+
+                    # Validación de correo en actualización
+                    while True:
+                        nuevo_email = input("Nuevo email: ")
+                        if validar_email(nuevo_email):
+                            break
+                        else:
+                            print("❌ Correo inválido. Ejemplo válido: ejemplo@gmail.com")
+
+                    nueva_password = input("Nueva contrasenia: ")
                     
                     sql_actualizar_usuario = """
                     UPDATE usuarios 
@@ -114,31 +129,48 @@ def gestionar_base_datos():
                     WHERE id_usuarios = %s
                     """
                     cursor.execute(sql_actualizar_usuario, (nuevo_nombre, nuevo_email, nueva_password, id_usuario_actualizar))
+
+                    # --- Actualizar Flor asociada ---
+                    cursor.execute("SELECT * FROM servicios WHERE comprador = %s", (id_usuario_actualizar,))
+                    servicios_existentes = cursor.fetchall()
+
+                    if servicios_existentes:
+                        for servicio in servicios_existentes:
+                            print(f"\nActualizando flor con ID {servicio[0]} (actual: {servicio[1]}, {servicio[2]}, ${servicio[3]})")
+                            nuevo_nombre_flor = input("Nuevo nombre de la flor: ")
+                            nueva_descripcion = input("Nueva descripcion: ")
+                            nuevo_precio = float(input("Nuevo precio: "))
+
+                            sql_actualizar_flor = """
+                            UPDATE servicios
+                            SET nombre_flor = %s, description = %s, precio = %s
+                            WHERE id_servicio = %s
+                            """
+                            cursor.execute(sql_actualizar_flor, (nuevo_nombre_flor, nueva_descripcion, nuevo_precio, servicio[0]))
+
                     conexion.commit()
-                    print(f"Usuario con ID {id_usuario_actualizar} ha sido actualizado")
+                    print(f"✅ Usuario con ID {id_usuario_actualizar} y sus flores han sido actualizados")
                 else:
-                    print(f"No se encontró un usuario con ID {id_usuario_actualizar}")
-            
+                    print("❌ Usuario no encontrado")
+
             elif opcion == "4":
+                # --- Mostrar todos los usuarios ---
+                print("\n--- Lista de Usuarios ---")
+                cursor.execute("SELECT id_usuarios, nombre_usuario, email, fecha_registro FROM usuarios")
+                usuarios = cursor.fetchall()
+                if not usuarios:
+                    print("No hay usuarios registrados")
+                else:
+                    print("{:<5} {:<15} {:<25} {:<20}".format("ID", "Nombre", "Email", "Fecha Registro"))
+                    print("-" * 70)
+                    for u in usuarios:
+                        print("{:<5} {:<15} {:<25} {:<20}".format(u[0], u[1], u[2], str(u[3])))
+
+            elif opcion == "5":
                 print("Saliendo del programa")
-                break           
+                break
             else:
                 print("Opcion no valida")
-
-            # --- Consulta final (Excluyendo id_servicio) ---
-            consulta_relacionada = """
-            SELECT s.nombre_flor, s.description, s.precio, u.nombre_usuario 
-            FROM servicios s
-            INNER JOIN usuarios u ON s.comprador = u.id_usuarios
-            """
-            cursor.execute(consulta_relacionada)
-            filas = cursor.fetchall()
-            
-            print("\n--- Lista de Servicios Vendidos Actualizada ---")
-            if not filas:
-                print("No hay servicios o usuarios registrados en este momento")
-            for fila in filas:
-                print(f"Flor: {fila[0]} | Info: {fila[1]} | Precio: ${fila[2]} | Cliente: {fila[3]}")
 
     except Error as e:
         print(f"Fallo: {e}")
